@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\App;
 use App\Http\Controllers\Auth\FacebookController;
+use App\Http\Controllers\Admin\SurveyArchitectController;
 use App\Models\User;
 use App\Models\SecurityEvent;
 
@@ -164,6 +165,32 @@ Route::middleware([
     'reject.suspended',
 ])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+
+    Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
+        Route::get('/surveys', [SurveyArchitectController::class, 'index'])->name('surveys.index');
+        Route::get('/surveys/create', [SurveyArchitectController::class, 'create'])->name('surveys.create');
+        Route::post('/surveys', [SurveyArchitectController::class, 'store'])->name('surveys.store');
+        Route::delete('/surveys/{survey}', [SurveyArchitectController::class, 'destroy'])->name('surveys.destroy');
+
+        Route::get('/surveys/{survey}/versions/{version}', [SurveyArchitectController::class, 'editVersion'])->name('surveys.versions.edit');
+        Route::post('/surveys/{survey}/versions/{version}/clone', [SurveyArchitectController::class, 'cloneVersion'])->name('surveys.versions.clone');
+        Route::post('/surveys/{survey}/versions/{version}/publish', [SurveyArchitectController::class, 'publishVersion'])->name('surveys.versions.publish');
+
+        Route::post('/surveys/{survey}/versions/{version}/questions', [SurveyArchitectController::class, 'storeQuestion'])->name('surveys.questions.store');
+        Route::patch('/surveys/{survey}/versions/{version}/questions/{question}', [SurveyArchitectController::class, 'updateQuestion'])->name('surveys.questions.update');
+        Route::patch('/surveys/{survey}/versions/{version}/questions/{question}/move', [SurveyArchitectController::class, 'moveQuestion'])->name('surveys.questions.move');
+        Route::patch('/surveys/{survey}/versions/{version}/question-order', [SurveyArchitectController::class, 'reorderQuestions'])->name('surveys.questions.reorder');
+        Route::delete('/surveys/{survey}/versions/{version}/questions/{question}', [SurveyArchitectController::class, 'destroyQuestion'])->name('surveys.questions.destroy');
+        Route::patch('/surveys/{survey}/versions/{version}/rating-scale', [SurveyArchitectController::class, 'updateRatingScale'])->name('surveys.rating-scale.update');
+
+        Route::post('/surveys/{survey}/versions/{version}/questions/{question}/options', [SurveyArchitectController::class, 'storeOption'])->name('surveys.options.store');
+        Route::patch('/surveys/{survey}/versions/{version}/questions/{question}/options/{option}', [SurveyArchitectController::class, 'updateOption'])->name('surveys.options.update');
+        Route::delete('/surveys/{survey}/versions/{version}/questions/{question}/options/{option}', [SurveyArchitectController::class, 'destroyOption'])->name('surveys.options.destroy');
+
+        Route::post('/surveys/{survey}/versions/{version}/edges', [SurveyArchitectController::class, 'storeEdge'])->name('surveys.edges.store');
+        Route::patch('/surveys/{survey}/versions/{version}/edges/{edge}', [SurveyArchitectController::class, 'updateEdge'])->name('surveys.edges.update');
+        Route::delete('/surveys/{survey}/versions/{version}/edges/{edge}', [SurveyArchitectController::class, 'destroyEdge'])->name('surveys.edges.destroy');
+    });
 });
 
 require __DIR__.'/settings.php';

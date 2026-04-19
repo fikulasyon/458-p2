@@ -73,12 +73,18 @@ test('users can logout', function () {
 test('users are rate limited', function () {
     $user = User::factory()->create();
 
-    RateLimiter::increment(md5('login'.implode('|', [$user->email, 'localhost'])), amount: 5);
+    $ip = '127.0.0.1';
+    $key = md5('login'.$ip.'|'.$user->email);
 
-    $response = $this->post(route('login.store'), [
-        'email' => $user->email,
-        'password' => 'wrong-password',
-    ]);
+    RateLimiter::clear($key);
+    RateLimiter::increment($key, amount: 60);
+
+    $response = $this
+        ->withServerVariables(['REMOTE_ADDR' => $ip])
+        ->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'wrong-password',
+        ]);
 
     $response->assertTooManyRequests();
 });

@@ -31,9 +31,10 @@ class SchemaVersioningService
                 'status' => 'draft',
                 'base_version_id' => $baseVersion->id,
                 'is_active' => false,
-                'schema_meta' => [
-                    'cloned_from_version_id' => $baseVersion->id,
-                ],
+                'schema_meta' => array_merge(
+                    $baseVersion->schema_meta ?? [],
+                    ['cloned_from_version_id' => $baseVersion->id],
+                ),
             ]);
 
             $questionIdMap = [];

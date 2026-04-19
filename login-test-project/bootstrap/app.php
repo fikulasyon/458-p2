@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'reject.challenged' => \App\Http\Middleware\RejectChallengedAccounts::class,
             'reject.challenge_locked' => \App\Http\Middleware\RejectChallengeLockedAccounts::class,
             'reject.suspended' => \App\Http\Middleware\EnsureNotSuspended::class,
+            'admin' => \App\Http\Middleware\EnsureAdmin::class,
         ]);
 
         $middleware->web(append: [

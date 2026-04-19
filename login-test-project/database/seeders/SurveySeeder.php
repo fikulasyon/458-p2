@@ -36,6 +36,7 @@ class SurveySeeder extends Seeder
             ['title' => 'Dream Job Finder'],
             [
                 'description' => 'Adaptive survey that suggests a work style path.',
+                'survey_type' => 'multiple_choice',
                 'created_by' => $admin->id,
             ],
         );
