@@ -257,6 +257,39 @@ class SurveyArchitectController extends Controller
             ->with('status', "Published version v{$published->version_number}.");
     }
 
+    public function destroyVersion(Survey $survey, SurveyVersion $version): RedirectResponse
+    {
+        $this->ensureVersionBelongsToSurvey($survey, $version);
+        $this->ensureVersionIsNotActive($version);
+
+        $versionCount = SurveyVersion::query()
+            ->where('survey_id', $survey->id)
+            ->count();
+
+        if ($versionCount <= 1) {
+            throw ValidationException::withMessages([
+                'version_delete' => 'Cannot delete the only version. Delete the survey instead.',
+            ]);
+        }
+
+        $nextVersion = SurveyVersion::query()
+            ->where('survey_id', $survey->id)
+            ->whereKeyNot($version->id)
+            ->orderByRaw("case when status = 'draft' then 0 else 1 end")
+            ->orderByDesc('version_number')
+            ->first();
+
+        $version->delete();
+
+        if ($nextVersion) {
+            return redirect()->route('admin.surveys.versions.edit', [$survey, $nextVersion])
+                ->with('status', 'Draft version deleted.');
+        }
+
+        return redirect()->route('admin.surveys.index')
+            ->with('status', 'Draft version deleted.');
+    }
+
     public function storeQuestion(Request $request, Survey $survey, SurveyVersion $version): RedirectResponse
     {
         $this->ensureVersionBelongsToSurvey($survey, $version);
@@ -377,6 +410,9 @@ class SurveyArchitectController extends Controller
             $targetQuestion->update(['order_index' => $currentOrder]);
         });
 
+        $this->normalizeQuestionOrder($version);
+        $this->syncEntryNode($version);
+
         return back()->with('status', 'Question order updated.');
     }
 
@@ -418,10 +454,11 @@ class SurveyArchitectController extends Controller
                     ->whereKey($questionId)
                     ->update([
                         'order_index' => $index + 1,
-                        'is_entry' => $index === 0,
                     ]);
             }
         });
+
+        $this->syncEntryNode($version);
 
         return back()->with('status', 'Question order updated.');
     }
@@ -470,15 +507,13 @@ class SurveyArchitectController extends Controller
         $this->ensureDraftVersion($version);
         $this->ensureQuestionBelongsToVersion($question, $version);
 
-        QuestionEdge::query()
-            ->where('survey_version_id', $version->id)
-            ->where(function ($query) use ($question) {
-                $query->where('from_question_id', $question->id)
-                    ->orWhere('to_question_id', $question->id);
-            })
-            ->delete();
+        DB::transaction(function () use ($question, $version): void {
+            $question->delete();
+            $this->normalizeQuestionOrder($version);
+            $this->syncEntryNode($version);
+        });
 
-        return back()->with('status', 'Question kept. Connected edges were removed.');
+        return back()->with('status', 'Question deleted.');
     }
 
     public function storeOption(Request $request, Survey $survey, SurveyVersion $version, SurveyQuestion $question): RedirectResponse
@@ -697,6 +732,15 @@ class SurveyArchitectController extends Controller
         }
     }
 
+    protected function ensureVersionIsNotActive(SurveyVersion $version): void
+    {
+        if ($version->is_active) {
+            throw ValidationException::withMessages([
+                'version_delete' => 'Active version cannot be deleted.',
+            ]);
+        }
+    }
+
     protected function ensureQuestionAcceptsOptions(SurveyQuestion $question): void
     {
         if ($question->type === 'result') {
@@ -739,6 +783,24 @@ class SurveyArchitectController extends Controller
             }
 
             $question->update(['order_index' => $expected]);
+        }
+    }
+
+    protected function syncEntryNode(SurveyVersion $version): void
+    {
+        $orderedQuestions = SurveyQuestion::query()
+            ->where('survey_version_id', $version->id)
+            ->orderBy('order_index')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($orderedQuestions as $index => $question) {
+            $isEntry = $index === 0;
+            if ((bool) $question->is_entry === $isEntry) {
+                continue;
+            }
+
+            $question->update(['is_entry' => $isEntry]);
         }
     }
 

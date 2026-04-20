@@ -1,15 +1,16 @@
 <?php
 
+use App\Http\Controllers\Admin\SurveyArchitectController;
+use App\Http\Controllers\Admin\SurveyMonitoringController;
+use App\Http\Controllers\Auth\FacebookController;
+use App\Http\Controllers\ChallengeController;
+use App\Models\SecurityEvent;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
-use App\Http\Controllers\ChallengeController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\App;
-use App\Http\Controllers\Auth\FacebookController;
-use App\Http\Controllers\Admin\SurveyArchitectController;
-use App\Models\User;
-use App\Models\SecurityEvent;
 
 /*
 |--------------------------------------------------------------------------
@@ -99,6 +100,7 @@ Route::get('/force-logout', function (Request $request) {
     Auth::logout();
     $request->session()->invalidate();
     $request->session()->regenerateToken();
+
     return redirect('/login');
 });
 
@@ -175,6 +177,9 @@ Route::middleware([
         Route::get('/surveys/{survey}/versions/{version}', [SurveyArchitectController::class, 'editVersion'])->name('surveys.versions.edit');
         Route::post('/surveys/{survey}/versions/{version}/clone', [SurveyArchitectController::class, 'cloneVersion'])->name('surveys.versions.clone');
         Route::post('/surveys/{survey}/versions/{version}/publish', [SurveyArchitectController::class, 'publishVersion'])->name('surveys.versions.publish');
+        Route::delete('/surveys/{survey}/versions/{version}', [SurveyArchitectController::class, 'destroyVersion'])->name('surveys.versions.destroy');
+        Route::get('/surveys/monitor/conflicts', [SurveyMonitoringController::class, 'conflicts'])->name('surveys.monitor.conflicts');
+        Route::get('/surveys/monitor/sessions/{session}', [SurveyMonitoringController::class, 'session'])->name('surveys.monitor.session');
 
         Route::post('/surveys/{survey}/versions/{version}/questions', [SurveyArchitectController::class, 'storeQuestion'])->name('surveys.questions.store');
         Route::patch('/surveys/{survey}/versions/{version}/questions/{question}', [SurveyArchitectController::class, 'updateQuestion'])->name('surveys.questions.update');

@@ -452,12 +452,33 @@ export default function EditSurveyVersion({
                         >
                             Publish Version
                         </Button>
+                        {!version.is_active && (
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    const confirmed = window.confirm(
+                                        `Delete non-active version v${version.version_number}?`,
+                                    );
+
+                                    if (!confirmed) {
+                                        return;
+                                    }
+
+                                    router.delete(`/admin/surveys/${survey.id}/versions/${version.id}`);
+                                }}
+                            >
+                                Delete Draft
+                            </Button>
+                        )}
                     </div>
                     {errors.publish && (
                         <p className="w-full text-sm text-destructive">{errors.publish}</p>
                     )}
                     {errors.version && (
                         <p className="w-full text-sm text-destructive">{errors.version}</p>
+                    )}
+                    {errors.version_delete && (
+                        <p className="w-full text-sm text-destructive">{errors.version_delete}</p>
                     )}
                 </div>
 
@@ -621,7 +642,7 @@ export default function EditSurveyVersion({
                                                         )
                                                     }
                                                 >
-                                                    Disconnect Edges
+                                                    Delete Node
                                                 </Button>
                                             </div>
                                         </form>

@@ -86,7 +86,7 @@ it('lets admin create, model, and publish a draft survey version', function () {
     ]);
 });
 
-it('removes invalid edges when source options change and keeps question nodes', function () {
+it('removes invalid edges when source options change and deletes question nodes', function () {
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
@@ -145,7 +145,7 @@ it('removes invalid edges when source options change and keeps question nodes', 
     $this->actingAs($admin)->delete("/admin/surveys/{$survey->id}/versions/{$version->id}/questions/{$target->id}")
         ->assertRedirect();
 
-    $this->assertDatabaseHas('survey_questions', [
+    $this->assertDatabaseMissing('survey_questions', [
         'id' => $target->id,
     ]);
 });
@@ -333,10 +333,143 @@ it('supports linear survey builders for rating and open-ended types', function (
         'from_option_id' => 999999,
         'to_question_id' => $second->id,
     ])->assertSessionHasErrors('survey');
+
+    $this->actingAs($admin)->delete("/admin/surveys/{$survey->id}/versions/{$version->id}/questions/{$first->id}")
+        ->assertRedirect();
+
+    $this->assertDatabaseMissing('survey_questions', [
+        'id' => $first->id,
+    ]);
 })->with([
     ['rating', 'rating'],
     ['open_ended', 'text'],
 ]);
+
+it('allows deleting a draft version while keeping the survey', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post('/admin/surveys', [
+            'title' => 'Draft Delete Survey',
+            'description' => 'Has published and draft versions',
+            'survey_type' => 'multiple_choice',
+        ])
+        ->assertRedirect();
+
+    $survey = Survey::query()->where('title', 'Draft Delete Survey')->firstOrFail();
+    $v1 = SurveyVersion::query()->where('survey_id', $survey->id)->where('version_number', 1)->firstOrFail();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/questions", [
+        'stable_key' => 'q_start',
+        'title' => 'Start',
+    ])->assertRedirect();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/questions/".SurveyQuestion::query()->where('survey_version_id', $v1->id)->where('stable_key', 'q_start')->value('id')."/options", [
+        'value' => 'go',
+        'label' => 'Go',
+    ])->assertRedirect();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/publish")
+        ->assertRedirect();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/clone")
+        ->assertRedirect();
+
+    $draft = SurveyVersion::query()
+        ->where('survey_id', $survey->id)
+        ->where('status', 'draft')
+        ->orderByDesc('version_number')
+        ->firstOrFail();
+
+    $this->actingAs($admin)
+        ->delete("/admin/surveys/{$survey->id}/versions/{$draft->id}")
+        ->assertRedirect("/admin/surveys/{$survey->id}/versions/{$v1->id}");
+
+    $this->assertDatabaseMissing('survey_versions', [
+        'id' => $draft->id,
+    ]);
+
+    $this->assertDatabaseHas('surveys', [
+        'id' => $survey->id,
+    ]);
+});
+
+it('allows deleting non-active published versions', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post('/admin/surveys', [
+            'title' => 'Delete Non Active Version Survey',
+            'description' => 'Delete published non-active version',
+            'survey_type' => 'multiple_choice',
+        ])
+        ->assertRedirect();
+
+    $survey = Survey::query()->where('title', 'Delete Non Active Version Survey')->firstOrFail();
+    $v1 = SurveyVersion::query()->where('survey_id', $survey->id)->where('version_number', 1)->firstOrFail();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/questions", [
+        'stable_key' => 'q_start',
+        'title' => 'Start',
+    ])->assertRedirect();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/publish")
+        ->assertRedirect();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/clone")
+        ->assertRedirect();
+
+    $v2 = SurveyVersion::query()
+        ->where('survey_id', $survey->id)
+        ->where('status', 'draft')
+        ->orderByDesc('version_number')
+        ->firstOrFail();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v2->id}/publish")
+        ->assertRedirect();
+
+    $v1 = $v1->fresh();
+    expect($v1->is_active)->toBeFalse();
+
+    $this->actingAs($admin)
+        ->delete("/admin/surveys/{$survey->id}/versions/{$v1->id}")
+        ->assertRedirect("/admin/surveys/{$survey->id}/versions/{$v2->id}");
+
+    $this->assertDatabaseMissing('survey_versions', [
+        'id' => $v1->id,
+    ]);
+});
+
+it('blocks deleting active versions', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post('/admin/surveys', [
+            'title' => 'Active Version Guard Survey',
+            'description' => 'Cannot delete active',
+            'survey_type' => 'multiple_choice',
+        ])
+        ->assertRedirect();
+
+    $survey = Survey::query()->where('title', 'Active Version Guard Survey')->firstOrFail();
+    $v1 = SurveyVersion::query()->where('survey_id', $survey->id)->where('version_number', 1)->firstOrFail();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/questions", [
+        'stable_key' => 'q_start',
+        'title' => 'Start',
+    ])->assertRedirect();
+
+    $this->actingAs($admin)->post("/admin/surveys/{$survey->id}/versions/{$v1->id}/publish")
+        ->assertRedirect();
+
+    $this->actingAs($admin)
+        ->delete("/admin/surveys/{$survey->id}/versions/{$v1->id}")
+        ->assertSessionHasErrors('version_delete');
+
+    $this->assertDatabaseHas('survey_versions', [
+        'id' => $v1->id,
+    ]);
+});
 
 it('allows admin to delete a survey from the architect list', function () {
     $admin = User::factory()->create(['is_admin' => true]);

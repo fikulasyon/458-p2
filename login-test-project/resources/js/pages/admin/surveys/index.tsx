@@ -141,17 +141,40 @@ export default function SurveyArchitectIndex({ surveys }: { surveys: SurveySumma
                                                         : '-'}
                                                 </td>
                                                 <td className="py-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() =>
-                                                            router.visit(
-                                                                `/admin/surveys/${survey.id}/versions/${version.id}`,
-                                                            )
-                                                        }
-                                                    >
-                                                        Open
-                                                    </Button>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() =>
+                                                                router.visit(
+                                                                    `/admin/surveys/${survey.id}/versions/${version.id}`,
+                                                                )
+                                                            }
+                                                        >
+                                                            Open
+                                                        </Button>
+                                                        {!version.is_active && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="destructive"
+                                                                onClick={() => {
+                                                                    const confirmed = window.confirm(
+                                                                        `Delete non-active version v${version.version_number} of "${survey.title}"?`,
+                                                                    );
+
+                                                                    if (!confirmed) {
+                                                                        return;
+                                                                    }
+
+                                                                    router.delete(
+                                                                        `/admin/surveys/${survey.id}/versions/${version.id}`,
+                                                                    );
+                                                                }}
+                                                            >
+                                                                Delete Draft
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

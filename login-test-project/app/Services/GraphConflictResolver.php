@@ -11,8 +11,7 @@ class GraphConflictResolver
     public function __construct(
         protected SurveyGraphBuilder $graphBuilder,
         protected SurveyVisibilityEngine $visibilityEngine,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{
@@ -29,6 +28,8 @@ class GraphConflictResolver
         $session->loadMissing([
             'answers' => fn ($query) => $query->where('is_active', true)->orderBy('id'),
             'currentQuestion',
+            'currentVersion.questions.options',
+            'startedVersion.questions.options',
         ]);
 
         $graph = $this->graphBuilder->build($newVersion);
@@ -78,12 +79,13 @@ class GraphConflictResolver
         return [
             'conflict_detected' => $conflictType !== null,
             'conflict_type' => $conflictType,
-            'can_atomic_recovery' => ! $currentNodeUnreachable && empty($unreachableAnswerNodes),
+            'can_atomic_recovery' => $conflictType === null,
             'details' => [
                 'current_stable_key' => $currentStableKey,
                 'missing_answer_nodes' => $missingAnswerNodes,
                 'unreachable_answer_nodes' => $unreachableAnswerNodes,
                 'visible_questions' => $visibleQuestions,
+                'content_changes' => [],
             ],
             'answers_by_stable_key' => $mappedAnswers,
             'visible_questions' => $visibleQuestions,

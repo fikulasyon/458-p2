@@ -9,11 +9,9 @@ class SurveyVisibilityEngine
     public function __construct(
         protected SurveyGraphBuilder $graphBuilder,
         protected SurveyGraphValidator $graphValidator,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param  SurveyVersion|int  $version
      * @param  array<string, mixed>  $answersByStableKey
      * @return array{
      *   visible_question_ids:array<int, int>,
@@ -26,6 +24,21 @@ class SurveyVisibilityEngine
     public function calculate(SurveyVersion|int $version, array $answersByStableKey = []): array
     {
         $graph = $this->graphBuilder->build($version);
+
+        if (($graph['version']->survey->survey_type ?? 'multiple_choice') !== 'multiple_choice') {
+            $orderedQuestions = $graph['questions']
+                ->sortBy([['order_index', 'asc'], ['id', 'asc']])
+                ->values();
+
+            return [
+                'visible_question_ids' => $orderedQuestions->pluck('id')->all(),
+                'visible_stable_keys' => $orderedQuestions->pluck('stable_key')->all(),
+                'hidden_stable_keys' => [],
+                'errors' => [],
+                'topological_order' => $orderedQuestions->pluck('id')->all(),
+            ];
+        }
+
         $validation = $this->graphValidator->validateGraph($graph);
 
         $topologicalOrder = $validation['topological_order'];
@@ -42,6 +55,7 @@ class SurveyVisibilityEngine
 
             if ($question->is_entry) {
                 $visible[$questionId] = true;
+
                 continue;
             }
 

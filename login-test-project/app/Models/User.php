@@ -68,10 +68,17 @@ class User extends Authenticatable
         return $this->hasMany(SurveySession::class);
     }
 
+    public function mobileApiTokens(): HasMany
+    {
+        return $this->hasMany(MobileApiToken::class);
+    }
+
     public function transitionState(string $to, ?int $actorUserId = null, array $meta = []): void
     {
         $from = (string) ($this->account_state ?? 'Active');
-        if ($from === $to) return;
+        if ($from === $to) {
+            return;
+        }
 
         $this->account_state = $to;
         $this->save();

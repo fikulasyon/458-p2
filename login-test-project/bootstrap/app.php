@@ -10,6 +10,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'reject.challenge_locked' => \App\Http\Middleware\RejectChallengeLockedAccounts::class,
             'reject.suspended' => \App\Http\Middleware\EnsureNotSuspended::class,
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'mobile.token' => \App\Http\Middleware\AuthenticateMobileToken::class,
         ]);
 
         $middleware->web(append: [

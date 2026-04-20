@@ -158,10 +158,29 @@ export default function EditLinearSurveyVersion({
                         >
                             Publish Version
                         </Button>
+                        {!version.is_active && (
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    const confirmed = window.confirm(
+                                        `Delete non-active version v${version.version_number}?`,
+                                    );
+
+                                    if (!confirmed) {
+                                        return;
+                                    }
+
+                                    router.delete(`/admin/surveys/${survey.id}/versions/${version.id}`);
+                                }}
+                            >
+                                Delete Draft
+                            </Button>
+                        )}
                     </div>
                     {errors.publish && <p className="w-full text-sm text-destructive">{errors.publish}</p>}
                     {errors.version && <p className="w-full text-sm text-destructive">{errors.version}</p>}
                     {errors.survey && <p className="w-full text-sm text-destructive">{errors.survey}</p>}
+                    {errors.version_delete && <p className="w-full text-sm text-destructive">{errors.version_delete}</p>}
                 </div>
 
                 <div className="rounded-lg border p-4">
@@ -354,6 +373,20 @@ export default function EditLinearSurveyVersion({
                                     <div className="md:col-span-2 flex flex-wrap items-center gap-2">
                                         <Button type="submit" size="sm" disabled={draftLocked}>
                                             Save Question
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="destructive"
+                                            disabled={draftLocked}
+                                            onClick={() =>
+                                                router.delete(
+                                                    `/admin/surveys/${survey.id}/versions/${version.id}/questions/${question.id}`,
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        >
+                                            Delete Question
                                         </Button>
                                     </div>
                                 </form>

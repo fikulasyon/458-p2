@@ -13,7 +13,6 @@ use App\Services\SchemaVersioningService;
 use App\Services\SessionRecoveryService;
 use App\Services\SurveyGraphValidator;
 use App\Services\SurveyVisibilityEngine;
-use Illuminate\Support\Collection;
 
 function createVersionWithGraph(Survey $survey, int $versionNumber, array $questionDefs, array $edgeDefs): array
 {
@@ -195,7 +194,7 @@ it('detects conflict when current question is removed in a new version', functio
         ->and($result['conflict_type'])->toBe('current_node_missing');
 });
 
-it('performs atomic recovery when removed nodes do not invalidate the remaining path', function () {
+it('rolls back and replays to the next valid node when a passed node is deleted', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $taker = User::factory()->create();
 
@@ -257,14 +256,15 @@ it('performs atomic recovery when removed nodes do not invalidate the remaining 
 
     $session->refresh();
 
-    expect($result['recovery_strategy'])->toBe('atomic_recovery')
+    expect($result['recovery_strategy'])->toBe('rollback')
         ->and($result['dropped_answers'])->toContain('q_removed')
-        ->and($session->status)->toBe('conflict_recovered')
+        ->and($session->status)->toBe('rolled_back')
+        ->and($session->stable_node_key)->toBe('q_next')
         ->and($session->currentQuestion?->stable_key)->toBe('q_next')
         ->and(SurveyAnswer::query()->where('session_id', $session->id)->where('question_stable_key', 'q_removed')->value('is_active'))->toBeFalse();
 });
 
-it('rolls back to last stable node when remapping is unsafe', function () {
+it('drops fallback-node answer when a passed edge no longer matches', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     $taker = User::factory()->create();
 
@@ -338,11 +338,367 @@ it('rolls back to last stable node when remapping is unsafe', function () {
     $session->refresh();
 
     expect($result['recovery_strategy'])->toBe('rollback')
+        ->and($result['dropped_answers'])->toContain('q1')
         ->and($result['dropped_answers'])->toContain('q2')
         ->toContain('q3')
         ->and($session->status)->toBe('rolled_back')
         ->and($session->stable_node_key)->toBe('q1')
-        ->and($session->currentQuestion?->stable_key)->toBe('q1');
+        ->and($session->currentQuestion?->stable_key)->toBe('q1')
+        ->and(SurveyAnswer::query()->where('session_id', $session->id)->where('question_stable_key', 'q1')->value('is_active'))->toBeFalse();
+});
+
+it('replays to the new branch target when an answered edge changes destination', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $taker = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'title' => 'Edge Target Change Survey',
+        'created_by' => $admin->id,
+    ]);
+
+    [$versionOne, $v1Questions] = createVersionWithGraph($survey, 1, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'a', 'label' => 'A'],
+            ],
+        ],
+        [
+            'stable_key' => 'q2',
+            'type' => 'multiple_choice',
+            'options' => [
+                ['value' => 'c', 'label' => 'C'],
+            ],
+        ],
+        ['stable_key' => 'q4', 'type' => 'text'],
+        ['stable_key' => 'q5', 'type' => 'text'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'a'],
+        ['from' => 'q2', 'to' => 'q4', 'operator' => 'equals', 'value' => 'c'],
+    ]);
+
+    $versionOne->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionOne->id]);
+
+    $session = SurveySession::query()->create([
+        'survey_id' => $survey->id,
+        'user_id' => $taker->id,
+        'started_version_id' => $versionOne->id,
+        'current_version_id' => $versionOne->id,
+        'current_question_id' => $v1Questions['q4']->id,
+        'status' => 'in_progress',
+    ]);
+
+    SurveyAnswer::query()->create([
+        'session_id' => $session->id,
+        'question_stable_key' => 'q1',
+        'question_id' => $v1Questions['q1']->id,
+        'answer_value' => 'a',
+        'valid_under_version_id' => $versionOne->id,
+        'is_active' => true,
+    ]);
+
+    SurveyAnswer::query()->create([
+        'session_id' => $session->id,
+        'question_stable_key' => 'q2',
+        'question_id' => $v1Questions['q2']->id,
+        'answer_value' => 'c',
+        'valid_under_version_id' => $versionOne->id,
+        'is_active' => true,
+    ]);
+
+    [$versionTwo] = createVersionWithGraph($survey, 2, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'a', 'label' => 'A'],
+            ],
+        ],
+        [
+            'stable_key' => 'q2',
+            'type' => 'multiple_choice',
+            'options' => [
+                ['value' => 'c', 'label' => 'C'],
+            ],
+        ],
+        ['stable_key' => 'q4', 'type' => 'text'],
+        ['stable_key' => 'q5', 'type' => 'text'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'a'],
+        ['from' => 'q2', 'to' => 'q5', 'operator' => 'equals', 'value' => 'c'],
+    ]);
+
+    $versionOne->update(['is_active' => false]);
+    $versionTwo->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionTwo->id]);
+
+    $result = app(SessionRecoveryService::class)->reconcileSession($session->fresh(), $versionTwo);
+    $session->refresh();
+
+    expect($result['recovery_strategy'])->toBe('rollback')
+        ->and($session->status)->toBe('rolled_back')
+        ->and($session->stable_node_key)->toBe('q5')
+        ->and($session->currentQuestion?->stable_key)->toBe('q5')
+        ->and($result['dropped_answers'])->not->toContain('q1')
+        ->and($result['dropped_answers'])->not->toContain('q2');
+});
+
+it('falls back to the source node when its answered option is removed', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $taker = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'title' => 'Option Removal Fallback Survey',
+        'created_by' => $admin->id,
+    ]);
+
+    [$versionOne, $v1Questions] = createVersionWithGraph($survey, 1, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'a', 'label' => 'A'],
+            ],
+        ],
+        [
+            'stable_key' => 'q2',
+            'type' => 'multiple_choice',
+            'options' => [
+                ['value' => 'c', 'label' => 'C'],
+                ['value' => 'd', 'label' => 'D'],
+            ],
+        ],
+        ['stable_key' => 'q4', 'type' => 'text'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'a'],
+        ['from' => 'q2', 'to' => 'q4', 'operator' => 'equals', 'value' => 'c'],
+    ]);
+
+    $versionOne->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionOne->id]);
+
+    $session = SurveySession::query()->create([
+        'survey_id' => $survey->id,
+        'user_id' => $taker->id,
+        'started_version_id' => $versionOne->id,
+        'current_version_id' => $versionOne->id,
+        'current_question_id' => $v1Questions['q4']->id,
+        'status' => 'in_progress',
+    ]);
+
+    SurveyAnswer::query()->create([
+        'session_id' => $session->id,
+        'question_stable_key' => 'q1',
+        'question_id' => $v1Questions['q1']->id,
+        'answer_value' => 'a',
+        'valid_under_version_id' => $versionOne->id,
+        'is_active' => true,
+    ]);
+
+    SurveyAnswer::query()->create([
+        'session_id' => $session->id,
+        'question_stable_key' => 'q2',
+        'question_id' => $v1Questions['q2']->id,
+        'answer_value' => 'c',
+        'valid_under_version_id' => $versionOne->id,
+        'is_active' => true,
+    ]);
+
+    [$versionTwo] = createVersionWithGraph($survey, 2, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'a', 'label' => 'A'],
+            ],
+        ],
+        [
+            'stable_key' => 'q2',
+            'type' => 'multiple_choice',
+            'options' => [
+                ['value' => 'd', 'label' => 'D'],
+            ],
+        ],
+        ['stable_key' => 'q4', 'type' => 'text'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'a'],
+        ['from' => 'q2', 'to' => 'q4', 'operator' => 'equals', 'value' => 'd'],
+    ]);
+
+    $versionOne->update(['is_active' => false]);
+    $versionTwo->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionTwo->id]);
+
+    $result = app(SessionRecoveryService::class)->reconcileSession($session->fresh(), $versionTwo);
+    $session->refresh();
+
+    expect($result['recovery_strategy'])->toBe('rollback')
+        ->and($session->status)->toBe('rolled_back')
+        ->and($session->stable_node_key)->toBe('q2')
+        ->and($session->currentQuestion?->stable_key)->toBe('q2')
+        ->and($result['dropped_answers'])->toContain('q2')
+        ->and(SurveyAnswer::query()->where('session_id', $session->id)->where('question_stable_key', 'q1')->value('is_active'))->toBeTrue()
+        ->and(SurveyAnswer::query()->where('session_id', $session->id)->where('question_stable_key', 'q2')->value('is_active'))->toBeFalse();
+});
+
+it('restarts from the new entry when no stable replay node can be derived', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $taker = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'title' => 'Nuclear Restart Survey',
+        'created_by' => $admin->id,
+    ]);
+
+    [$versionOne, $v1Questions] = createVersionWithGraph($survey, 1, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'a', 'label' => 'A'],
+            ],
+        ],
+        ['stable_key' => 'q2', 'type' => 'text'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'a'],
+    ]);
+
+    $versionOne->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionOne->id]);
+
+    $session = SurveySession::query()->create([
+        'survey_id' => $survey->id,
+        'user_id' => $taker->id,
+        'started_version_id' => $versionOne->id,
+        'current_version_id' => $versionOne->id,
+        'current_question_id' => $v1Questions['q2']->id,
+        'status' => 'in_progress',
+    ]);
+
+    SurveyAnswer::query()->create([
+        'session_id' => $session->id,
+        'question_stable_key' => 'q1',
+        'question_id' => $v1Questions['q1']->id,
+        'answer_value' => 'a',
+        'valid_under_version_id' => $versionOne->id,
+        'is_active' => true,
+    ]);
+
+    [$versionTwo] = createVersionWithGraph($survey, 2, [
+        [
+            'stable_key' => 'q_new',
+            'type' => 'multiple_choice',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'x', 'label' => 'X'],
+            ],
+        ],
+        ['stable_key' => 'q_new_next', 'type' => 'text'],
+    ], [
+        ['from' => 'q_new', 'to' => 'q_new_next', 'operator' => 'equals', 'value' => 'x'],
+    ]);
+
+    $versionOne->update(['is_active' => false]);
+    $versionTwo->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionTwo->id]);
+
+    $result = app(SessionRecoveryService::class)->reconcileSession($session->fresh(), $versionTwo);
+    $session->refresh();
+
+    expect($result['recovery_strategy'])->toBe('rollback')
+        ->and($session->status)->toBe('rolled_back')
+        ->and($session->stable_node_key)->toBe('q_new')
+        ->and($session->currentQuestion?->stable_key)->toBe('q_new')
+        ->and($result['dropped_answers'])->toContain('q1')
+        ->and(SurveyAnswer::query()->where('session_id', $session->id)->where('is_active', true)->count())->toBe(0);
+});
+
+it('does not flag conflicts for text or option-label edits when DAG logic is unchanged', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $taker = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'title' => 'Content Edit No-Conflict Survey',
+        'created_by' => $admin->id,
+    ]);
+
+    [$versionOne, $v1Questions] = createVersionWithGraph($survey, 1, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'title' => 'Choose path',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'yes', 'label' => 'Yes'],
+                ['value' => 'no', 'label' => 'No'],
+            ],
+        ],
+        ['stable_key' => 'q2', 'type' => 'text', 'title' => 'Follow-up'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'yes'],
+    ]);
+
+    $versionOne->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionOne->id]);
+
+    $session = SurveySession::query()->create([
+        'survey_id' => $survey->id,
+        'user_id' => $taker->id,
+        'started_version_id' => $versionOne->id,
+        'current_version_id' => $versionOne->id,
+        'current_question_id' => $v1Questions['q2']->id,
+        'status' => 'in_progress',
+    ]);
+
+    SurveyAnswer::query()->create([
+        'session_id' => $session->id,
+        'question_stable_key' => 'q1',
+        'question_id' => $v1Questions['q1']->id,
+        'answer_value' => 'yes',
+        'valid_under_version_id' => $versionOne->id,
+        'is_active' => true,
+    ]);
+
+    [$versionTwo] = createVersionWithGraph($survey, 2, [
+        [
+            'stable_key' => 'q1',
+            'type' => 'multiple_choice',
+            'title' => 'Choose your updated path',
+            'is_entry' => true,
+            'options' => [
+                ['value' => 'yes', 'label' => 'Absolutely'],
+                ['value' => 'no', 'label' => 'No'],
+                ['value' => 'maybe', 'label' => 'Maybe'],
+            ],
+        ],
+        ['stable_key' => 'q2', 'type' => 'text', 'title' => 'Follow-up'],
+    ], [
+        ['from' => 'q1', 'to' => 'q2', 'operator' => 'equals', 'value' => 'yes'],
+    ]);
+
+    $versionOne->update(['is_active' => false]);
+    $versionTwo->update(['status' => 'published', 'is_active' => true, 'published_at' => now()]);
+    $survey->update(['active_version_id' => $versionTwo->id]);
+
+    $analysis = app(GraphConflictResolver::class)->detectConflict($session->fresh(), $versionTwo);
+    expect($analysis['conflict_detected'])->toBeFalse()
+        ->and($analysis['conflict_type'])->toBeNull()
+        ->and($analysis['can_atomic_recovery'])->toBeTrue();
+
+    $result = app(SessionRecoveryService::class)->reconcileSession($session->fresh(), $versionTwo);
+    $session->refresh();
+
+    expect($result['recovery_strategy'])->toBe('atomic_recovery')
+        ->and($result['conflict_detected'])->toBeFalse()
+        ->and($session->status)->toBe('in_progress')
+        ->and($session->currentQuestion?->stable_key)->toBe('q2');
 });
 
 it('prevents zombie questions in recovered session state', function () {
