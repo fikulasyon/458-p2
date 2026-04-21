@@ -449,6 +449,7 @@ export default function EditSurveyVersion({
                                 )
                             }
                             disabled={draftLocked}
+                            data-test="publish-version-button"
                         >
                             Publish Version
                         </Button>

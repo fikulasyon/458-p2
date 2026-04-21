@@ -30,8 +30,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
+import com.lolsurvey.mobile.ui.AutomationTags
 import com.lolsurvey.mobile.ui.RunnerUiModel
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonElement
@@ -40,7 +45,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SurveyRunnerScreen(
     runner: RunnerUiModel,
@@ -72,14 +77,25 @@ fun SurveyRunnerScreen(
     }
 
     Scaffold(
+        modifier = Modifier
+            .semantics { testTagsAsResourceId = true }
+            .testTag(AutomationTags.SCREEN_SURVEY_RUNNER),
         topBar = {
             TopAppBar(
                 title = {
                     Text("Survey Runner #${envelope.session.id}")
                 },
                 actions = {
-                    TextButton(onClick = onRefresh, enabled = !isLoading) { Text("Sync") }
-                    TextButton(onClick = onLeave, enabled = !isLoading) { Text("Back") }
+                    TextButton(
+                        onClick = onRefresh,
+                        enabled = !isLoading,
+                        modifier = Modifier.testTag(AutomationTags.RUNNER_SYNC_BUTTON),
+                    ) { Text("Sync") }
+                    TextButton(
+                        onClick = onLeave,
+                        enabled = !isLoading,
+                        modifier = Modifier.testTag(AutomationTags.RUNNER_BACK_BUTTON),
+                    ) { Text("Back") }
                 },
             )
         },
@@ -94,30 +110,47 @@ fun SurveyRunnerScreen(
         ) {
             if (isLoading) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(modifier = Modifier.testTag(AutomationTags.RUNNER_LOADING_INDICATOR))
                     Text("Applying request...")
                 }
             }
 
             if (errorMessage != null) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.RUNNER_ERROR_CARD),
+                ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = onClearError) { Text("Dismiss") }
+                        TextButton(
+                            onClick = onClearError,
+                            modifier = Modifier.testTag(AutomationTags.RUNNER_ERROR_DISMISS_BUTTON),
+                        ) { Text("Dismiss") }
                     }
                 }
             }
 
             if (envelope.versionSync.mismatchDetected) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.RUNNER_CONFLICT_CARD),
+                ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text("Schema updated while session was in progress.")
-                        Text("Recovery: ${envelope.versionSync.recoveryStrategy ?: "none"}")
+                        Text(
+                            "Recovery: ${envelope.versionSync.recoveryStrategy ?: "none"}",
+                            modifier = Modifier.testTag(AutomationTags.RUNNER_CONFLICT_STRATEGY_TEXT),
+                        )
                         if (envelope.versionSync.conflictDetected) {
-                            Text("Conflict type: ${envelope.versionSync.conflictType ?: "unknown"}")
+                            Text(
+                                "Conflict type: ${envelope.versionSync.conflictType ?: "unknown"}",
+                                modifier = Modifier.testTag(AutomationTags.RUNNER_CONFLICT_TYPE_TEXT),
+                            )
                         }
                         if (envelope.versionSync.droppedAnswers.isNotEmpty()) {
                             Text("Dropped answers: ${envelope.versionSync.droppedAnswers.joinToString(", ")}")
@@ -126,7 +159,11 @@ fun SurveyRunnerScreen(
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(AutomationTags.RUNNER_STATE_CARD),
+            ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Session status: ${envelope.state.sessionStatus}")
                     Text("Visible nodes: ${envelope.state.visibleQuestions.joinToString(", ")}")
@@ -137,13 +174,22 @@ fun SurveyRunnerScreen(
             }
 
             if (currentQuestion != null) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.RUNNER_CURRENT_QUESTION_CARD),
+                ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(currentQuestion.title, style = MaterialTheme.typography.titleMedium)
-                        Text("Node: ${currentQuestion.stableKey} (${currentQuestion.type})")
+                        Text(
+                            "Node: ${currentQuestion.stableKey} (${currentQuestion.type})",
+                            modifier = Modifier.testTag(
+                                AutomationTags.runnerCurrentQuestionKey(currentQuestion.stableKey),
+                            ),
+                        )
 
                         when (currentQuestion.type) {
                             "multiple_choice" -> {
@@ -153,7 +199,14 @@ fun SurveyRunnerScreen(
                                             onSubmitAnswer(currentQuestion.stableKey, JsonPrimitive(option.value))
                                         },
                                         enabled = !isLoading,
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag(
+                                                AutomationTags.runnerMultipleChoiceOption(
+                                                    currentQuestion.stableKey,
+                                                    option.value,
+                                                ),
+                                            ),
                                     ) {
                                         Text(option.label)
                                     }
@@ -177,6 +230,7 @@ fun SurveyRunnerScreen(
                                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                             ),
+                                            modifier = Modifier.testTag(AutomationTags.runnerRatingChip(value)),
                                         )
                                     }
                                 }
@@ -192,6 +246,7 @@ fun SurveyRunnerScreen(
                                         }
                                     },
                                     enabled = !isLoading && selectedRating > 0,
+                                    modifier = Modifier.testTag(AutomationTags.RUNNER_RATING_SUBMIT_BUTTON),
                                 ) {
                                     Text("Submit Rating")
                                 }
@@ -202,20 +257,26 @@ fun SurveyRunnerScreen(
                                     value = openEndedText,
                                     onValueChange = { openEndedText = it },
                                     label = { Text("Your answer") },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag(AutomationTags.RUNNER_OPEN_ENDED_INPUT),
                                 )
                                 Button(
                                     onClick = {
                                         onSubmitAnswer(currentQuestion.stableKey, JsonPrimitive(openEndedText.trim()))
                                     },
                                     enabled = !isLoading && openEndedText.isNotBlank(),
+                                    modifier = Modifier.testTag(AutomationTags.RUNNER_OPEN_ENDED_SUBMIT_BUTTON),
                                 ) {
                                     Text("Submit Text")
                                 }
                             }
 
                             "result" -> {
-                                Text("Result node reached. You can complete the survey now.")
+                                Text(
+                                    "Result node reached. You can complete the survey now.",
+                                    modifier = Modifier.testTag(AutomationTags.RUNNER_RESULT_HINT),
+                                )
                             }
 
                             else -> {
@@ -225,7 +286,11 @@ fun SurveyRunnerScreen(
                     }
                 }
             } else {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.RUNNER_NO_QUESTION_CARD),
+                ) {
                     Text(
                         text = "No active question. If all required answers are present, complete the session.",
                         modifier = Modifier.padding(12.dp),
@@ -236,7 +301,9 @@ fun SurveyRunnerScreen(
             Button(
                 onClick = onComplete,
                 enabled = envelope.state.canComplete && !isLoading,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(AutomationTags.RUNNER_COMPLETE_BUTTON),
             ) {
                 Text("Complete Session")
             }

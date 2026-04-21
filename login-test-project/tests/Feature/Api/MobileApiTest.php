@@ -79,6 +79,207 @@ function mobileAuthHeader($testCase, User $user, string $password = 'password'):
     ];
 }
 
+/**
+ * @param  array<int, string>  $values
+ * @return array<int, string>
+ */
+function mobileSortedValues(array $values): array
+{
+    $sorted = array_values($values);
+    sort($sorted);
+
+    return $sorted;
+}
+
+/**
+ * @param  array<int, string>  $expectedDroppedAnswers
+ */
+function assertMobileVersionSyncEnvelope(
+    $response,
+    int $fromVersionId,
+    int $toVersionId,
+    bool $conflictDetected,
+    string $recoveryStrategy,
+    array $expectedDroppedAnswers = [],
+): void {
+    $response
+        ->assertJsonPath('version_sync.mismatch_detected', true)
+        ->assertJsonPath('version_sync.from_version_id', $fromVersionId)
+        ->assertJsonPath('version_sync.to_version_id', $toVersionId)
+        ->assertJsonPath('version_sync.conflict_detected', $conflictDetected)
+        ->assertJsonPath('version_sync.recovery_strategy', $recoveryStrategy);
+
+    $actualDropped = mobileSortedValues((array) $response->json('version_sync.dropped_answers', []));
+    $expectedDropped = mobileSortedValues($expectedDroppedAnswers);
+    expect($actualDropped)->toBe($expectedDropped);
+}
+
+/**
+ * @param  array<int, string>  $expectedDroppedAnswers
+ */
+function assertMobileConflictLogIntegrity(
+    int $sessionId,
+    int $oldVersionId,
+    int $newVersionId,
+    string $recoveryStrategy,
+    array $expectedDroppedAnswers = [],
+    ?string $expectedFallbackStableKey = null,
+): SurveyConflictLog {
+    $logs = SurveyConflictLog::query()
+        ->where('session_id', $sessionId)
+        ->orderBy('id')
+        ->get();
+
+    expect($logs)->toHaveCount(1);
+
+    /** @var SurveyConflictLog $log */
+    $log = $logs->last();
+    $details = (array) ($log->details ?? []);
+
+    expect($log->old_version_id)->toBe($oldVersionId)
+        ->and($log->new_version_id)->toBe($newVersionId)
+        ->and($log->recovery_strategy)->toBe($recoveryStrategy)
+        ->and($log->conflict_type)->not->toBeNull();
+
+    $actualDropped = mobileSortedValues((array) ($details['dropped_answers'] ?? []));
+    $expectedDropped = mobileSortedValues($expectedDroppedAnswers);
+    expect($actualDropped)->toBe($expectedDropped);
+
+    if ($recoveryStrategy === 'rollback') {
+        expect($details['replay_reason'] ?? null)->not->toBeNull();
+        if ($expectedFallbackStableKey !== null) {
+            expect($details['fallback_node_key'] ?? null)->toBe($expectedFallbackStableKey);
+        }
+    }
+
+    return $log;
+}
+
+function mobileNormalizeValue(mixed $value): mixed
+{
+    if (is_bool($value) || is_int($value) || is_float($value)) {
+        return $value;
+    }
+
+    if ($value === null) {
+        return null;
+    }
+
+    if (is_array($value)) {
+        return array_map(fn ($item) => mobileNormalizeValue($item), $value);
+    }
+
+    $stringValue = trim((string) $value);
+    $lower = strtolower($stringValue);
+
+    if ($lower === 'true') {
+        return true;
+    }
+
+    if ($lower === 'false') {
+        return false;
+    }
+
+    if (is_numeric($stringValue)) {
+        return str_contains($stringValue, '.') ? (float) $stringValue : (int) $stringValue;
+    }
+
+    return $stringValue;
+}
+
+function mobileEdgeConditionPasses(string $operator, mixed $conditionValue, mixed $parentAnswer): bool
+{
+    if ($operator === 'always') {
+        return true;
+    }
+
+    if ($parentAnswer === null) {
+        return false;
+    }
+
+    $actual = mobileNormalizeValue($parentAnswer);
+    $expected = mobileNormalizeValue($conditionValue);
+
+    return match ($operator) {
+        'equals' => $actual === $expected,
+        'not_equals' => $actual !== $expected,
+        default => false,
+    };
+}
+
+/**
+ * @param  array<string, mixed>  $answersByStable
+ * @param  array<int, string>  $visibleStableKeys
+ */
+function assertNoZombieVisibleQuestionsForMultipleChoice(
+    SurveyVersion $version,
+    array $answersByStable,
+    array $visibleStableKeys,
+): void {
+    $version->loadMissing(['questions', 'edges']);
+    if (($version->survey->survey_type ?? 'multiple_choice') !== 'multiple_choice') {
+        return;
+    }
+
+    $questionsById = $version->questions->keyBy('id');
+    $reachable = [];
+
+    $entryQuestions = $version->questions
+        ->where('is_entry', true)
+        ->values();
+
+    if ($entryQuestions->isEmpty()) {
+        $fallbackEntry = $version->questions->sortBy([['order_index', 'asc'], ['id', 'asc']])->first();
+        if ($fallbackEntry) {
+            $entryQuestions = collect([$fallbackEntry]);
+        }
+    }
+
+    foreach ($entryQuestions as $entryQuestion) {
+        $reachable[$entryQuestion->stable_key] = true;
+    }
+
+    $edges = $version->edges
+        ->sortBy([['priority', 'asc'], ['id', 'asc']])
+        ->values();
+
+    $changed = true;
+    while ($changed) {
+        $changed = false;
+
+        foreach ($edges as $edge) {
+            $from = $questionsById->get($edge->from_question_id);
+            $to = $questionsById->get($edge->to_question_id);
+
+            if (! $from || ! $to) {
+                continue;
+            }
+
+            if (! isset($reachable[$from->stable_key])) {
+                continue;
+            }
+
+            $parentAnswer = $answersByStable[$from->stable_key] ?? null;
+            if (! mobileEdgeConditionPasses(
+                (string) ($edge->condition_operator ?? 'equals'),
+                $edge->condition_value,
+                $parentAnswer
+            )) {
+                continue;
+            }
+
+            if (! isset($reachable[$to->stable_key])) {
+                $reachable[$to->stable_key] = true;
+                $changed = true;
+            }
+        }
+    }
+
+    foreach ($visibleStableKeys as $stableKey) {
+        expect(isset($reachable[$stableKey]))->toBeTrue();
+    }
+}
+
 it('authenticates mobile users with bearer tokens and supports logout', function () {
     $user = User::factory()->create([
         'password' => 'password',
@@ -367,16 +568,26 @@ it('returns conflict-aware version sync payload on schema mismatch', function ()
     $versionOne->update(['is_active' => false]);
     $survey->update(['active_version_id' => $versionTwo->id]);
 
-    $this->getJson("/api/mobile/sessions/{$session->id}/state", $headers)
+    $response = $this->getJson("/api/mobile/sessions/{$session->id}/state", $headers)
         ->assertOk()
-        ->assertJsonPath('version_sync.mismatch_detected', true)
-        ->assertJsonPath('version_sync.conflict_detected', true)
-        ->assertJsonPath('version_sync.recovery_strategy', 'rollback')
+        ->assertJsonPath('version_sync.conflict_type', 'current_node_unreachable')
         ->assertJsonPath('state.session_status', 'rolled_back')
         ->assertJsonPath('state.visible_questions.0', 'q_start')
         ->assertJsonMissingPath('state.visible_questions.1');
 
-    expect(SurveyConflictLog::query()->where('session_id', $session->id)->exists())->toBeTrue();
+    assertMobileVersionSyncEnvelope($response, $versionOne->id, $versionTwo->id, true, 'rollback', ['q_start']);
+    assertMobileConflictLogIntegrity($session->id, $versionOne->id, $versionTwo->id, 'rollback', ['q_start'], 'q_start');
+
+    $session->refresh();
+    expect($session->current_version_id)->toBe($versionTwo->id)
+        ->and($session->currentQuestion?->stable_key)->toBe('q_start')
+        ->and(SurveyAnswer::query()->where('session_id', $session->id)->where('is_active', true)->count())->toBe(0);
+
+    assertNoZombieVisibleQuestionsForMultipleChoice(
+        $versionTwo->fresh('survey'),
+        (array) $response->json('state.answers', []),
+        (array) $response->json('state.visible_questions', []),
+    );
 });
 
 it('keeps session valid when only question text or option labels change', function () {
@@ -445,14 +656,26 @@ it('keeps session valid when only question text or option labels change', functi
     $versionOne->update(['is_active' => false]);
     $survey->update(['active_version_id' => $versionTwo->id]);
 
-    $this->getJson("/api/mobile/sessions/{$session->id}/state", $headers)
+    $response = $this->getJson("/api/mobile/sessions/{$session->id}/state", $headers)
         ->assertOk()
-        ->assertJsonPath('version_sync.mismatch_detected', true)
-        ->assertJsonPath('version_sync.conflict_detected', false)
         ->assertJsonPath('version_sync.conflict_type', null)
-        ->assertJsonPath('version_sync.recovery_strategy', 'atomic_recovery')
         ->assertJsonPath('state.session_status', 'in_progress')
         ->assertJsonPath('state.current_question.stable_key', 'q_next');
+
+    assertMobileVersionSyncEnvelope($response, $versionOne->id, $versionTwo->id, false, 'atomic_recovery', []);
+    expect(SurveyConflictLog::query()->where('session_id', $session->id)->count())->toBe(0)
+        ->and(
+            SurveyAnswer::query()
+                ->where('session_id', $session->id)
+                ->where('question_stable_key', 'q_start')
+                ->value('valid_under_version_id')
+        )->toBe($versionTwo->id);
+
+    assertNoZombieVisibleQuestionsForMultipleChoice(
+        $versionTwo->fresh('survey'),
+        (array) $response->json('state.answers', []),
+        (array) $response->json('state.visible_questions', []),
+    );
 });
 
 it('reconciles safely on submit answer when schema mismatch exists', function () {
@@ -547,17 +770,42 @@ it('reconciles safely on submit answer when schema mismatch exists', function ()
     $versionOne->update(['is_active' => false]);
     $survey->update(['active_version_id' => $versionTwo->id]);
 
-    $this->postJson("/api/mobile/sessions/{$session->id}/answers", [
+    $response = $this->postJson("/api/mobile/sessions/{$session->id}/answers", [
         'question_stable_key' => 'q2',
         'answer_value' => 'd',
     ], $headers)
         ->assertOk()
-        ->assertJsonPath('version_sync.mismatch_detected', true)
-        ->assertJsonPath('version_sync.recovery_strategy', 'rollback')
-        ->assertJsonPath('version_sync.dropped_answers.0', 'q2')
         ->assertJsonPath('state.session_status', 'in_progress')
         ->assertJsonPath('state.current_question.stable_key', 'r_done')
         ->assertJsonPath('state.can_complete', true);
+
+    assertMobileVersionSyncEnvelope($response, $versionOne->id, $versionTwo->id, true, 'rollback', ['q2']);
+    assertMobileConflictLogIntegrity($session->id, $versionOne->id, $versionTwo->id, 'rollback', ['q2'], 'q2');
+
+    $q1Active = SurveyAnswer::query()
+        ->where('session_id', $session->id)
+        ->where('question_stable_key', 'q1')
+        ->where('is_active', true)
+        ->value('answer_value');
+
+    $q2Answers = SurveyAnswer::query()
+        ->where('session_id', $session->id)
+        ->where('question_stable_key', 'q2')
+        ->orderBy('id')
+        ->get();
+
+    expect($q1Active)->toBe('a')
+        ->and($q2Answers)->toHaveCount(2)
+        ->and((bool) $q2Answers[0]->is_active)->toBeFalse()
+        ->and($q2Answers[0]->answer_value)->toBe('c')
+        ->and((bool) $q2Answers[1]->is_active)->toBeTrue()
+        ->and($q2Answers[1]->answer_value)->toBe('d');
+
+    assertNoZombieVisibleQuestionsForMultipleChoice(
+        $versionTwo->fresh('survey'),
+        (array) $response->json('state.answers', []),
+        (array) $response->json('state.visible_questions', []),
+    );
 });
 
 it('reconciles safely on complete when schema mismatch exists', function () {
@@ -626,12 +874,31 @@ it('reconciles safely on complete when schema mismatch exists', function () {
     $versionOne->update(['is_active' => false]);
     $survey->update(['active_version_id' => $versionTwo->id]);
 
-    $this->postJson("/api/mobile/sessions/{$session->id}/complete", [], $headers)
+    $response = $this->postJson("/api/mobile/sessions/{$session->id}/complete", [], $headers)
         ->assertOk()
-        ->assertJsonPath('version_sync.mismatch_detected', true)
-        ->assertJsonPath('version_sync.recovery_strategy', 'rollback')
         ->assertJsonPath('session.status', 'completed')
         ->assertJsonPath('result.stable_key', 'r_new')
         ->assertJsonPath('answer_summary.0.question_stable_key', 'q1')
-        ->assertJsonPath('answer_summary.0.answer_value', 'yes');
+        ->assertJsonPath('answer_summary.0.answer_value', 'yes')
+        ->assertJsonMissingPath('answer_summary.1')
+        ->assertJsonPath('state.visible_questions.0', 'q1')
+        ->assertJsonPath('state.visible_questions.1', 'r_new');
+
+    assertMobileVersionSyncEnvelope($response, $versionOne->id, $versionTwo->id, true, 'rollback', []);
+    assertMobileConflictLogIntegrity($session->id, $versionOne->id, $versionTwo->id, 'rollback', [], 'r_new');
+
+    $q1Answer = SurveyAnswer::query()
+        ->where('session_id', $session->id)
+        ->where('question_stable_key', 'q1')
+        ->where('is_active', true)
+        ->first();
+
+    expect($q1Answer)->not->toBeNull()
+        ->and($q1Answer->valid_under_version_id)->toBe($versionTwo->id);
+
+    assertNoZombieVisibleQuestionsForMultipleChoice(
+        $versionTwo->fresh('survey'),
+        (array) $response->json('state.answers', []),
+        (array) $response->json('state.visible_questions', []),
+    );
 });

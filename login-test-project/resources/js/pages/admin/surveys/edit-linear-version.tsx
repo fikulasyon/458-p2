@@ -155,6 +155,7 @@ export default function EditLinearSurveyVersion({
                                 router.post(`/admin/surveys/${survey.id}/versions/${version.id}/publish`)
                             }
                             disabled={draftLocked}
+                            data-test="publish-version-button"
                         >
                             Publish Version
                         </Button>

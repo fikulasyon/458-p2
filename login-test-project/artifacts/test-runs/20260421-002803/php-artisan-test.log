@@ -1,0 +1,160 @@
+Step: Laravel test suite
+Command: php artisan test
+Working directory: C:\Users\faikk\Desktop\p2\LoginTestProject\login-test-project
+Started at: 2026-04-20T21:28:03.657Z
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true                                                                                            0.01s  
+
+   PASS  Tests\Feature\Admin\SurveyArchitectTest
+  ✓ it blocks non-admin users from survey architect routes                                                       0.50s  
+  ✓ it allows admin users to load survey architect index                                                         0.03s  
+  ✓ it lets admin create, model, and publish a draft survey version                                              0.06s  
+  ✓ it removes invalid edges when source options change and deletes question nodes                               0.05s  
+  ✓ it supports result nodes as edge targets and blocks options on result nodes                                  0.05s  
+  ✓ it replaces existing edge when adding another edge from the same option                                      0.05s  
+  ✓ it supports linear survey builders for rating and open-ended types with ('rating', 'rating')                 0.06s  
+  ✓ it supports linear survey builders for rating and open-ended types with ('open_ended', 'text')               0.05s  
+  ✓ it allows deleting a draft version while keeping the survey                                                  0.04s  
+  ✓ it allows deleting non-active published versions                                                             0.04s  
+  ✓ it blocks deleting active versions                                                                           0.03s  
+  ✓ it allows admin to delete a survey from the architect list                                                   0.02s  
+
+   PASS  Tests\Feature\Admin\SurveyMonitoringTest
+  ✓ it blocks non-admin users from survey monitoring endpoints                                                   0.03s  
+  ✓ it returns conflict feed for admins                                                                          0.03s  
+  ✓ it returns session mismatch diagnostics for admins                                                           0.03s  
+
+   PASS  Tests\Feature\Api\MobileApiLinearConflictMatrixTest
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('rating', 'RT_ATOMIC_01')                   0.23s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('rating', 'RT_RB_01')                       0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('rating', 'RT_RB_02')                       0.22s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('rating', 'RT_RB_03')                       0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('rating', 'RT_NUCLEAR_01')                  0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('open_ended', 'OE_ATOMIC_01')               0.21s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('open_ended', 'OE_RB_01')                   0.21s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('open_ended', 'OE_RB_02')                   0.21s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('open_ended', 'OE_RB_03')                   0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /state with ('open_ended', 'OE_NUCLEAR_01')              0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('rating', 'RT… 0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('rating', 'RT… 0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('rating', 'RT… 0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('rating', 'RT… 0.22s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('rating', 'RT… 0.21s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('open_ended',… 0.21s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('open_ended',… 0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('open_ended',… 0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('open_ended',… 0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /answers before accepting new input with ('open_ended',… 0.18s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /complete with ('rating', 'RT_ATOMIC_01')                0.18s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /complete with ('rating', 'RT_RB_01')                    0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /complete with ('rating', 'RT_NUCLEAR_01')               0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /complete with ('open_ended', 'OE_ATOMIC_01')            0.20s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /complete with ('open_ended', 'OE_RB_01')                0.19s  
+  ✓ it reconciles rating/open-ended matrix scenarios on /complete with ('open_ended', 'OE_NUCLEAR_01')           0.20s  
+
+   PASS  Tests\Feature\Api\MobileApiTest
+  ✓ it authenticates mobile users with bearer tokens and supports logout                                         0.06s  
+  ✓ it lists published surveys and returns published schema                                                      0.04s  
+  ✓ it starts sessions, advances answers, and supports linear rating flow                                        0.13s  
+  ✓ it returns conflict-aware version sync payload on schema mismatch                                            0.05s  
+  ✓ it keeps session valid when only question text or option labels change                                       0.06s  
+  ✓ it reconciles safely on submit answer when schema mismatch exists                                            0.07s  
+  ✓ it reconciles safely on complete when schema mismatch exists                                                 0.07s  
+
+   PASS  Tests\Feature\Auth\AuthenticationTest
+  ✓ login screen can be rendered                                                                                 0.04s  
+  ✓ users can authenticate using the login screen                                                                0.04s  
+  ✓ users with two factor enabled are redirected to two factor challenge                                         0.03s  
+  ✓ users can not authenticate with invalid password                                                             0.03s  
+  ✓ users can logout                                                                                             0.02s  
+  ✓ users are rate limited                                                                                       0.02s  
+
+   PASS  Tests\Feature\Auth\EmailVerificationTest
+  ✓ email verification screen can be rendered                                                                    0.03s  
+  ✓ email can be verified                                                                                        0.03s  
+  ✓ email is not verified with invalid hash                                                                      0.03s  
+  ✓ email is not verified with invalid user id                                                                   0.02s  
+  ✓ verified user is redirected to dashboard from verification prompt                                            0.02s  
+  ✓ already verified user visiting verification link is redirected without firing event again                    0.02s  
+
+   PASS  Tests\Feature\Auth\PasswordConfirmationTest
+  ✓ confirm password screen can be rendered                                                                      0.04s  
+  ✓ password confirmation requires authentication                                                                0.02s  
+
+   PASS  Tests\Feature\Auth\PasswordResetTest
+  ✓ reset password link screen can be rendered                                                                   0.02s  
+  ✓ reset password link can be requested                                                                         0.23s  
+  ✓ reset password screen can be rendered                                                                        0.22s  
+  ✓ password can be reset with valid token                                                                       0.23s  
+  ✓ password cannot be reset with invalid token                                                                  0.23s  
+
+   PASS  Tests\Feature\Auth\RegistrationTest
+  ✓ registration screen can be rendered                                                                          0.02s  
+  ✓ new users can register                                                                                       0.02s  
+
+   PASS  Tests\Feature\Auth\TwoFactorChallengeTest
+  ✓ two factor challenge redirects to login when not authenticated                                               0.02s  
+  ✓ two factor challenge can be rendered                                                                         0.03s  
+
+   PASS  Tests\Feature\Auth\VerificationNotificationTest
+  ✓ sends verification notification                                                                              0.02s  
+  ✓ does not send verification notification if email is verified                                                 0.01s  
+
+   PASS  Tests\Feature\DashboardTest
+  ✓ guests are redirected to the login page                                                                      0.02s  
+  ✓ authenticated users can visit the dashboard                                                                  0.02s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ returns a successful response                                                                                0.02s  
+
+   PASS  Tests\Feature\Settings\PasswordUpdateTest
+  ✓ password update page is displayed                                                                            0.02s  
+  ✓ password can be updated                                                                                      0.02s  
+  ✓ correct password must be provided to update password                                                         0.02s  
+
+   PASS  Tests\Feature\Settings\ProfileUpdateTest
+  ✓ profile page is displayed                                                                                    0.02s  
+  ✓ profile information can be updated                                                                           0.02s  
+  ✓ email verification status is unchanged when the email address is unchanged                                   0.02s  
+  ✓ user can delete their account                                                                                0.02s  
+  ✓ correct password must be provided to delete account                                                          0.02s  
+
+   PASS  Tests\Feature\Settings\TwoFactorAuthenticationTest
+  ✓ two factor settings page can be rendered                                                                     0.03s  
+  ✓ two factor settings page requires password confirmation when enabled                                         0.02s  
+  ✓ two factor settings page does not requires password confirmation when disabled                               0.02s  
+  ✓ two factor settings page returns forbidden response when two factor is disabled                              0.02s  
+
+   PASS  Tests\Feature\Survey\ConflictPolicyMatrixBootstrapCommandTest
+  ✓ it bootstraps a matrix scenario session via artisan command                                                  0.20s  
+
+   PASS  Tests\Feature\Survey\ConflictPolicyMatrixLivePrepareCommandTest
+  ✓ it prepares a live sync-conflict scenario with base active and scenario draft                                0.19s  
+
+   PASS  Tests\Feature\Survey\ConflictPolicyMatrixSeederTest
+  ✓ it seeds architect-visible versions for the conflict-policy matrix                                           0.17s  
+
+   PASS  Tests\Feature\Survey\ConflictPolicyMatrixTest
+  ✓ it freezes the multiple-choice conflict-policy matrix contract                                               0.01s  
+  ✓ it freezes the linear conflict-policy matrix contracts for rating and open-ended                             0.01s  
+
+   PASS  Tests\Feature\Survey\GraphConflictRecoveryTest
+  ✓ it detects DAG cycles in a survey version                                                                    0.02s  
+  ✓ it calculates visibility from conditional DAG edges                                                          0.02s  
+  ✓ it clones a survey version for draft editing                                                                 0.02s  
+  ✓ it detects conflict when current question is removed in a new version                                        0.03s  
+  ✓ it rolls back and replays to the next valid node when a passed node is deleted                               0.03s  
+  ✓ it drops fallback-node answer when a passed edge no longer matches                                           0.04s  
+  ✓ it replays to the new branch target when an answered edge changes destination                                0.04s  
+  ✓ it falls back to the source node when its answered option is removed                                         0.04s  
+  ✓ it restarts from the new entry when no stable replay node can be derived                                     0.03s  
+  ✓ it does not flag conflicts for text or option-label edits when DAG logic is unchanged                        0.04s  
+  ✓ it prevents zombie questions in recovered session state                                                      0.03s  
+
+  Tests:    105 passed (1090 assertions)
+  Duration: 9.66s
+
+
+Exit code: 0
+Duration: 10.22s

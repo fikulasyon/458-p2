@@ -1,0 +1,17 @@
+{
+  "name": "lol-survey-appium-scaffold",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "run:smoke": "node src/scripts/run-smoke.js",
+    "run:matrix": "node src/scripts/run-matrix-scenario.js",
+    "run:matrix-suite": "node src/scripts/run-matrix-suite.js",
+    "run:sync-conflict": "node src/scripts/run-sync-conflict.js",
+    "run:sync-suite": "node src/scripts/run-sync-suite.js"
+  },
+  "dependencies": {
+    "webdriverio": "^9.20.0"
+  }
+}

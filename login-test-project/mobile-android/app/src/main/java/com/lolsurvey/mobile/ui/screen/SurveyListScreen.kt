@@ -18,12 +18,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import com.lolsurvey.mobile.api.MobileUser
 import com.lolsurvey.mobile.api.SurveySummary
+import com.lolsurvey.mobile.ui.AutomationTags
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SurveyListScreen(
     user: MobileUser?,
@@ -36,12 +41,23 @@ fun SurveyListScreen(
     onStartSurvey: (SurveySummary) -> Unit,
 ) {
     Scaffold(
+        modifier = Modifier
+            .semantics { testTagsAsResourceId = true }
+            .testTag(AutomationTags.SCREEN_SURVEY_LIST),
         topBar = {
             TopAppBar(
                 title = { Text("Survey List") },
                 actions = {
-                    TextButton(onClick = onRefresh, enabled = !isLoading) { Text("Refresh") }
-                    TextButton(onClick = onLogout, enabled = !isLoading) { Text("Logout") }
+                    TextButton(
+                        onClick = onRefresh,
+                        enabled = !isLoading,
+                        modifier = Modifier.testTag(AutomationTags.SURVEY_LIST_REFRESH_BUTTON),
+                    ) { Text("Refresh") }
+                    TextButton(
+                        onClick = onLogout,
+                        enabled = !isLoading,
+                        modifier = Modifier.testTag(AutomationTags.SURVEY_LIST_LOGOUT_BUTTON),
+                    ) { Text("Logout") }
                 },
             )
         },
@@ -58,24 +74,38 @@ fun SurveyListScreen(
             }
 
             if (errorMessage != null) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.SURVEY_LIST_ERROR_CARD),
+                ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = onClearError) { Text("Dismiss") }
+                        TextButton(
+                            onClick = onClearError,
+                            modifier = Modifier.testTag(AutomationTags.SURVEY_LIST_ERROR_DISMISS_BUTTON),
+                        ) { Text("Dismiss") }
                     }
                 }
             }
 
             if (isLoading) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(modifier = Modifier.testTag(AutomationTags.SURVEY_LIST_LOADING_INDICATOR))
                     Text(text = "Loading surveys...")
                 }
             }
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(
+                modifier = Modifier.testTag(AutomationTags.SURVEY_LIST_ITEMS),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 items(surveys, key = { it.id }) { survey ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(AutomationTags.surveyCard(survey.id)),
+                    ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -91,6 +121,7 @@ fun SurveyListScreen(
                             Button(
                                 onClick = { onStartSurvey(survey) },
                                 enabled = !isLoading,
+                                modifier = Modifier.testTag(AutomationTags.surveyStartButton(survey.id)),
                             ) {
                                 Text("Start / Continue")
                             }

@@ -11,21 +11,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import com.lolsurvey.mobile.api.CompleteEnvelope
+import com.lolsurvey.mobile.ui.AutomationTags
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CompletionScreen(
     completion: CompleteEnvelope,
     onBackToSurveys: () -> Unit,
 ) {
-    Scaffold { padding ->
+    Scaffold(
+        modifier = Modifier
+            .semantics { testTagsAsResourceId = true }
+            .testTag(AutomationTags.SCREEN_COMPLETION),
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -33,9 +43,17 @@ fun CompletionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Survey Completed", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Survey Completed",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.testTag(AutomationTags.COMPLETION_HEADER),
+            )
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(AutomationTags.COMPLETION_SESSION_CARD),
+            ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -44,8 +62,14 @@ fun CompletionScreen(
                     Text("Status: ${completion.session.status}")
                     val result = completion.result ?: completion.state.result
                     if (result != null) {
-                        Text("Result: ${result.title}")
-                        Text("Key: ${result.stableKey}")
+                        Text(
+                            "Result: ${result.title}",
+                            modifier = Modifier.testTag(AutomationTags.COMPLETION_RESULT_TITLE),
+                        )
+                        Text(
+                            "Key: ${result.stableKey}",
+                            modifier = Modifier.testTag(AutomationTags.COMPLETION_RESULT_KEY),
+                        )
                     } else {
                         Text("No explicit result node.")
                     }
@@ -53,26 +77,40 @@ fun CompletionScreen(
             }
 
             if (completion.versionSync.mismatchDetected) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.COMPLETION_VERSION_SYNC_CARD),
+                ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text("Schema changed during session.")
-                        Text("Recovery: ${completion.versionSync.recoveryStrategy ?: "none"}")
+                        Text(
+                            "Recovery: ${completion.versionSync.recoveryStrategy ?: "none"}",
+                            modifier = Modifier.testTag(AutomationTags.COMPLETION_VERSION_SYNC_STRATEGY),
+                        )
                     }
                 }
             }
 
             if (completion.answerSummary.isNotEmpty()) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AutomationTags.COMPLETION_ANSWER_SUMMARY_CARD),
+                ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text("Submitted Answers", style = MaterialTheme.typography.titleMedium)
                         completion.answerSummary.forEachIndexed { index, item ->
-                            Text("${index + 1}. ${item.questionTitle} (${item.questionType})")
+                            Text(
+                                "${index + 1}. ${item.questionTitle} (${item.questionType})",
+                                modifier = Modifier.testTag(AutomationTags.completionAnswerItem(index)),
+                            )
                             Text(
                                 "Answer: ${toReadableAnswer(item.answerValue)}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -88,7 +126,9 @@ fun CompletionScreen(
 
             Button(
                 onClick = onBackToSurveys,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(AutomationTags.COMPLETION_BACK_BUTTON),
             ) {
                 Text("Back to Surveys")
             }

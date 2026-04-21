@@ -1,0 +1,46 @@
+{
+  "run_id": "20260421-005400",
+  "started_at": "2026-04-20T21:54:00.084Z",
+  "completed_at": "2026-04-20T21:54:11.626Z",
+  "status": "failed",
+  "artifacts_dir": "C:\\Users\\faikk\\Desktop\\p2\\LoginTestProject\\login-test-project\\artifacts\\test-runs\\20260421-005400",
+  "failed_steps": 1,
+  "steps": [
+    {
+      "id": "php-artisan-test",
+      "label": "Laravel test suite",
+      "status": "passed",
+      "code": 0,
+      "started_at": "2026-04-20T21:54:00.084Z",
+      "duration_seconds": 11.48,
+      "log_path": "C:\\Users\\faikk\\Desktop\\p2\\LoginTestProject\\login-test-project\\artifacts\\test-runs\\20260421-005400\\php-artisan-test.log"
+    },
+    {
+      "id": "android-testDebugUnitTest",
+      "label": "Android unit tests",
+      "status": "failed",
+      "code": 9009,
+      "started_at": "2026-04-20T21:54:11.564Z",
+      "duration_seconds": 0.06,
+      "log_path": "C:\\Users\\faikk\\Desktop\\p2\\LoginTestProject\\login-test-project\\artifacts\\test-runs\\20260421-005400\\android-testDebugUnitTest.log"
+    },
+    {
+      "id": "appium-matrix-suite",
+      "label": "Appium matrix suite",
+      "status": "skipped",
+      "code": null,
+      "started_at": "2026-04-20T21:54:11.626Z",
+      "duration_seconds": 0,
+      "log_path": "C:\\Users\\faikk\\Desktop\\p2\\LoginTestProject\\login-test-project\\artifacts\\test-runs\\20260421-005400\\appium-matrix-suite.log"
+    },
+    {
+      "id": "appium-sync-suite",
+      "label": "Appium sync suite",
+      "status": "skipped",
+      "code": null,
+      "started_at": "2026-04-20T21:54:11.626Z",
+      "duration_seconds": 0,
+      "log_path": "C:\\Users\\faikk\\Desktop\\p2\\LoginTestProject\\login-test-project\\artifacts\\test-runs\\20260421-005400\\appium-sync-suite.log"
+    }
+  ]
+}

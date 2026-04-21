@@ -39,6 +39,9 @@ If your Laravel server is elsewhere, update this value.
 - This is a minimum clean implementation focused on functional correctness.
 - The app keeps mobile token in `SharedPreferences` and reuses it on restart.
 - On any session call, conflict/recovery information returned by backend is shown in runner/completion UI.
+- Compose automation tags are now exposed as Android resource IDs for Appium selectors.
+- Appium scaffold lives under `mobile-android/automation/appium`.
+- Full project regression entrypoint is available at repo root: `npm run regression:full`.
 - Login defaults are prefilled in UI as:
   - email: `t1@g.com`
   - password: `123123123`

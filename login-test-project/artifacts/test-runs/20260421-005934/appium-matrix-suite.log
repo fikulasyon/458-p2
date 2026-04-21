@@ -1,0 +1,48 @@
+Step: Appium matrix suite
+Command: npm.cmd run run:matrix-suite
+Working directory: C:\Users\faikk\Desktop\p2\LoginTestProject\login-test-project\mobile-android\automation\appium
+Started at: 2026-04-20T21:59:48.575Z
+npm warn Unknown env config "public-hoist-pattern". This will stop working in the next major version of npm.
+
+> lol-survey-appium-scaffold@0.1.0 run:matrix-suite
+> node src/scripts/run-matrix-suite.js
+
+[FAIL] FLOW_MULTI_TYPE_01: Matrix command failed: survey:matrix-bootstrap
+Exit code: 1
+STDOUT:
+Scenario id FLOW_MULTI_TYPE_01 not found in conflict matrix.
+
+STDERR:
+
+========================================================================
+Matrix Mobile Suite Summary
+========================================================================
+Status: FAILED | Planned: 1 | Executed: 1 | Passed: 0 | Failed: 1 | Missing: 0
+------------------------------------------------------------------------
+Scenario Results:
+[FAIL] FLOW_MULTI_TYPE_01 | error=Matrix command failed: survey:matrix-bootstrap
+Exit code: 1
+STDOUT:
+Scenario id FLOW_MULTI_TYPE_01 not found in conflict matrix.
+
+STDERR:
+------------------------------------------------------------------------
+{
+  "status": "failed",
+  "suite_size": 1,
+  "executed": 1,
+  "passed": 0,
+  "failed": 1,
+  "missing": 0,
+  "missing_scenarios": [],
+  "scenarios": [
+    {
+      "status": "failed",
+      "scenario_id": "FLOW_MULTI_TYPE_01",
+      "error": "Matrix command failed: survey:matrix-bootstrap\nExit code: 1\nSTDOUT:\nScenario id FLOW_MULTI_TYPE_01 not found in conflict matrix.\r\n\nSTDERR:\n"
+    }
+  ]
+}
+
+Exit code: 1
+Duration: 2.50s
