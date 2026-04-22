@@ -23,10 +23,8 @@ Theme used in survey scenarios: **Which LoL Champion Are You?**
 - Appium unit tests (helper-level): `mobile-android/automation/appium/test/`
 - Appium matrix/sync executable automation scripts: `mobile-android/automation/appium/src/scripts/`
 
-### Report artifacts
-- Report package: `docs/report/`
-- UML (Markdown + HTML): `docs/report/uml.md`, `docs/report/uml.html`
-- Test-run artifacts (generated): `artifacts/test-runs/<run-id>/`
+### Test run artifacts
+- Generated regression artifacts: `artifacts/test-runs/<run-id>/`
 
 ## Project Structure (Quick)
 
@@ -93,14 +91,14 @@ When running full mobile + sync automation locally, use 4 terminals:
 ### Terminal 1 (repo root): Laravel + web
 
 ```powershell
-cd C:\Users\faikk\Desktop\p2\LoginTestProject\login-test-project
+cd .
 composer run dev
 ```
 
 ### Terminal 2 (Appium server)
 
 ```powershell
-cd C:\Users\faikk\Desktop\p2\LoginTestProject\login-test-project\mobile-android\automation\appium
+cd mobile-android\automation\appium
 appium server --address 127.0.0.1 --port 4723 --base-path /
 ```
 
@@ -111,7 +109,6 @@ Notes:
 ### Terminal 3 (Selenium server)
 
 ```powershell
-cd C:\Users\faikk\Desktop\p2\LoginTestProject\login-test-project
 npx selenium-standalone@latest start
 ```
 
@@ -120,7 +117,7 @@ This starts Selenium on `127.0.0.1:4444` (used by sync-conflict automation).
 ### Terminal 4 (repo root): regression run
 
 ```powershell
-cd C:\Users\faikk\Desktop\p2\LoginTestProject\login-test-project
+cd .
 npm run regression:full
 ```
 
@@ -179,7 +176,6 @@ This writes logs and summaries under:
 
 - Android app notes: `mobile-android/README.md`
 - Appium automation details + env variables: `mobile-android/automation/appium/README.md`
-- Report package guide: `docs/report/README.md`
 
 ## LLM vs Authors Contribution Statement
 
